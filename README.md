@@ -14,7 +14,7 @@ Choose Your Own GPT is a seemingly analog device without any screens or visible 
 
 ## Installation
 
-Download the arduino code and install the below libraries before compiling. You will need to visit api.openai.com and register for your own API key which does not need to be added to the code before upload, it can be set on the internal webserver. 
+Download the arduino code and install the below libraries before compiling. You will need to visit api.openai.com and register for your own API key. Copy the file `ChooseYourOwnGPT/src/credentials.h.template` to `ChooseYourOwnGPT/src/credentials.h` and replace `YOUR_OPENAI_API_KEY_HERE` with your actual OpenAI API key before compiling and uploading. The API key can also be set on the internal webserver after upload.
 
 Once powered on, connect to the ```GPT In a Box``` Wi-Fi network. Add your API key and modify your dial labels (if desired) and connect to your Wi-Fi network.
 ## Related

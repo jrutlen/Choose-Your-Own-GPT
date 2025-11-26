@@ -1,5 +1,6 @@
 //Wifi
 #include <Arduino.h>
+#include <WiFi.h>
 #include <WebServer.h>
 #include <NetWizard.h>
 //Hardware
@@ -12,7 +13,10 @@
 const int TOKENS = 750; // How lengthy a response you want, every token is about 3/4 a word
 const int NUM_MESSAGES = 14; 
 ChatGPTuino chat{ TOKENS, NUM_MESSAGES }; // Will store and send your most recent messages (up to NUM_MESSAGES)
-const char *model = "gpt-4o";  // OpenAI Model being used
+// OpenAI Model being used - gpt-4o is the current recommended model
+// Alternatives: "gpt-4o-mini" (faster, cheaper), "gpt-4-turbo" (older but stable)
+// See https://platform.openai.com/docs/models for current model availability
+const char *model = "gpt-4o";
 #define SERVER_RESPONSE_WAIT_TIME (30 * 1000) // Override ChatGPTuino default timeout of 15 seconds
 
 //Netwizard
@@ -51,7 +55,7 @@ const char* adventureNames[] = {
   " who go on adventure exploring secret caves.",
   " who go to a Magical School.",
   " who go on an adventure in an underground city.",
-  " who go on a Time Travel adventure in a Tardis."
+  " who go on a Time Travel adventure in a Tardis.",
   " who go on a Medieval Fantasy adventure.",
   " who go on a Arctic Expedition adventure.",
   " who go on a Jungle Safari adventure.",
@@ -318,7 +322,9 @@ void setup() {
 }
 
 void printTitle(int chapterNumber) {
-  printer.wake();
+  if (!printer.wake()) {
+    Serial.println("Warning: Printer wake failed");
+  }
   printer.setSize('L');
   //center text 
   printer.justify('C');
@@ -332,7 +338,13 @@ void printTitle(int chapterNumber) {
 }
 
 void sendToPrint(const char* message) {
-  printer.wake();
+  if (message == NULL) {
+    Serial.println("Error: Null message passed to sendToPrint");
+    return;
+  }
+  if (!printer.wake()) {
+    Serial.println("Warning: Printer wake failed");
+  }
   printer.setSize('S'); 
   printer.println(message);
   printer.feed(3);
@@ -577,6 +589,18 @@ void loop() {
     digitalWrite(dialLED3, LOW);
     state = 6; //story generating
   } else if (state == 6) { //story generating
+    // Validate dial indices before accessing arrays
+    if (dial[0] < 0 || dial[0] >= 10 || dial[1] < 0 || dial[1] >= 10 || dial[2] < 0 || dial[2] >= 16) {
+      Serial.println("Error: Invalid dial position");
+      Serial.printf("Dial values: %d, %d, %d\n", dial[0], dial[1], dial[2]);
+      // Signal error with red LED
+      WaitEnd.clear();
+      WaitEnd.fill(WaitEnd.Color(255,0,0), waitStart, waitLength);
+      WaitEnd.show();
+      delay(3000);
+      state = 4; // Return to ready state
+      return;
+    }
     const char* selectedAdventure =  adventureNames[dial[2]];
     const char* selectedName = names[dial[0]];
     const char* selectedName2 = names[dial[1]];
@@ -586,7 +610,18 @@ void loop() {
       selectedName2 = "their evil twin";
     }
     //construct the prompt with the separator between the names
-    char *initialPrompt = (char*) malloc(1 + strlen(prompt) + strlen(selectedName) + strlen(separator) + strlen(selectedName2) + strlen(selectedAdventure) + strlen(instructions));
+    size_t promptLength = 1 + strlen(prompt) + strlen(selectedName) + strlen(separator) + strlen(selectedName2) + strlen(selectedAdventure) + strlen(instructions);
+    char *initialPrompt = (char*) malloc(promptLength);
+    if (initialPrompt == NULL) {
+      Serial.println("Error: Memory allocation failed for initial prompt");
+      // Signal error with red LED
+      WaitEnd.clear();
+      WaitEnd.fill(WaitEnd.Color(255,0,0), waitStart, waitLength);
+      WaitEnd.show();
+      delay(3000);
+      state = 4; // Return to ready state
+      return;
+    }
     strcpy(initialPrompt, prompt);
     strcat(initialPrompt, selectedName);
     strcat(initialPrompt, separator);
@@ -594,15 +629,72 @@ void loop() {
     strcat(initialPrompt, selectedAdventure);
     strcat(initialPrompt, instructions); //add instructions to the prompt
 
+    // Check WiFi connection before making API call
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("Error: WiFi not connected");
+      free(initialPrompt);
+      // Signal error with red LED
+      WaitEnd.clear();
+      WaitEnd.fill(WaitEnd.Color(255,0,0), waitStart, waitLength);
+      WaitEnd.show();
+      delay(3000);
+      state = 4; // Return to ready state
+      return;
+    }
+
     chat.putMessage(initialPrompt, strlen(initialPrompt)); //request story outline
     printTitle(currentChapter);
-    chat.getResponse(); //get outline but don't send it to the printer
-    //Serial.println(chat.getLastMessageContent());
+    
+    // Get outline with error handling
+    int outlineResult = chat.getResponse();
+    if (outlineResult != 0) {
+      Serial.println("Error: Failed to get story outline from API");
+      Serial.printf("Error code: %d\n", outlineResult);
+      free(initialPrompt);
+      // Signal error with red LED
+      WaitEnd.clear();
+      WaitEnd.fill(WaitEnd.Color(255,0,0), waitStart, waitLength);
+      WaitEnd.show();
+      delay(3000);
+      state = 4; // Return to ready state
+      return;
+    }
+    Serial.println("Story outline received successfully");
+    
     const char* startStory = "Begin";
     chat.putMessage(startStory, strlen(startStory)); //request first chapter of story
-    chat.getResponse();
-    //Serial.println(chat.getLastMessageContent());
-    sendToPrint(chat.getLastMessageContent());
+    
+    // Get first chapter with error handling
+    int chapterResult = chat.getResponse();
+    if (chapterResult != 0) {
+      Serial.println("Error: Failed to get first chapter from API");
+      Serial.printf("Error code: %d\n", chapterResult);
+      free(initialPrompt);
+      // Signal error with red LED
+      WaitEnd.clear();
+      WaitEnd.fill(WaitEnd.Color(255,0,0), waitStart, waitLength);
+      WaitEnd.show();
+      delay(3000);
+      state = 4; // Return to ready state
+      return;
+    }
+    Serial.println("First chapter received successfully");
+    
+    const char* content = chat.getLastMessageContent();
+    if (content == NULL || strlen(content) == 0) {
+      Serial.println("Error: Empty response from API");
+      free(initialPrompt);
+      // Signal error with red LED
+      WaitEnd.clear();
+      WaitEnd.fill(WaitEnd.Color(255,0,0), waitStart, waitLength);
+      WaitEnd.show();
+      delay(3000);
+      state = 4; // Return to ready state
+      return;
+    }
+    
+    sendToPrint(content);
+    free(initialPrompt); // Clean up allocated memory
     ledcAttachChannel(btnLEDyl, dialFreq, resolution, ledChannelDials);
     ledcAttachChannel(btnLEDbl, dialFreq, resolution, ledChannelDials); 
     ledcAttachChannel(btnLEDrd, buttonFreq, resolution, ledChannelBtn);
@@ -619,6 +711,19 @@ void loop() {
     digitalWrite(dialLED1, LOW);
     digitalWrite(dialLED2, LOW);
     digitalWrite(dialLED3, LOW);
+
+    // Check WiFi connection before making API call
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("Error: WiFi not connected");
+      // Signal error with red LED
+      WaitEnd.clear();
+      WaitEnd.fill(WaitEnd.Color(255,0,0), waitStart, waitLength);
+      WaitEnd.show();
+      delay(3000);
+      currentChapter--; // Decrement chapter since we didn't complete it
+      state = 9; // Return to waiting for decision
+      return;
+    }
 
     if (decision == 1) { //surprise ending requested (red button pressed)
       chat.putMessage(surpriseEnding, strlen(surpriseEnding));
@@ -639,8 +744,37 @@ void loop() {
     }
     Serial.println("Requesting Chapter: " + String(currentChapter));
     printTitle(currentChapter);
-    chat.getResponse();
-    printer.println(chat.getLastMessageContent());
+    
+    // Get chapter with error handling
+    int chapterResult = chat.getResponse();
+    if (chapterResult != 0) {
+      Serial.println("Error: Failed to get chapter from API");
+      Serial.printf("Error code: %d\n", chapterResult);
+      // Signal error with red LED
+      WaitEnd.clear();
+      WaitEnd.fill(WaitEnd.Color(255,0,0), waitStart, waitLength);
+      WaitEnd.show();
+      delay(3000);
+      currentChapter--; // Decrement chapter since we didn't complete it
+      state = 9; // Return to waiting for decision to retry
+      return;
+    }
+    Serial.println("Chapter received successfully");
+    
+    const char* content = chat.getLastMessageContent();
+    if (content == NULL || strlen(content) == 0) {
+      Serial.println("Error: Empty response from API");
+      // Signal error with red LED
+      WaitEnd.clear();
+      WaitEnd.fill(WaitEnd.Color(255,0,0), waitStart, waitLength);
+      WaitEnd.show();
+      delay(3000);
+      currentChapter--; // Decrement chapter since we didn't complete it
+      state = 9; // Return to waiting for decision to retry
+      return;
+    }
+    
+    printer.println(content);
     printer.feed(3);
     //printer.sleep();      // Tell printer to sleep
     
