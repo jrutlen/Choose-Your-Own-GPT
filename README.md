@@ -43,7 +43,8 @@ Choose Your Own GPT is a seemingly analog device without any screens or visible 
 
 Once powered on, the device will create a Wi-Fi access point:
 
-1. Connect to the `ChooseYourOwnGPT` Wi-Fi network (password: `itMightBeMagic`)
+1. Connect to the `ChooseYourOwnGPT` Wi-Fi network (default password: `itMightBeMagic`)
+   > **Security Note**: The default password is hardcoded in the firmware. For enhanced security, consider changing it in the source code before uploading.
 2. Your device should automatically open the configuration portal, or navigate to `http://192.168.4.1`
 3. Configure the following:
    - **OpenAI API Key**: Get one from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)

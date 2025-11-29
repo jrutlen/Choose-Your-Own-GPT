@@ -29,7 +29,7 @@ NetWizard NW(&server);
 
 // Setup configuration parameters
 NetWizardParameter nw_api_header(&NW, NW_HEADER, "OpenAI Configuration");
-NetWizardParameter nw_api_key(&NW, NW_INPUT, "API Key", "api_key", key);
+NetWizardParameter nw_api_key(&NW, NW_INPUT, "API Key", "api_key", "");
 
 NetWizardParameter nw_prompt_header(&NW, NW_HEADER, "Story Prompts");
 NetWizardParameter nw_story_prompt(&NW, NW_INPUT, "Story Prompt", "story_prompt", "Please write a simple outline for a 5 chapter choose your own adventure story. The first act should set up the story and provide a pivotal decision at the end that will completely change the course of the story. The second act should present a challenge and incorporate a choice that will come back in the 5th and final chapter. The third act should provide a false victory or twist. The fourth act should be the final push. The 5th and final act is the climax and resolution. The story is about ");
@@ -163,7 +163,11 @@ void loadConfiguration() {
   preferences.begin("config", false);
   
   // Load API key
-  apiKey = preferences.getString("api_key", String(key));
+  apiKey = preferences.getString("api_key", "");
+  // If no API key in preferences, use the one from credentials.h
+  if (apiKey.length() == 0) {
+    apiKey = String(key);
+  }
   
   // Load prompts
   prompt = preferences.getString("story_prompt", "Please write a simple outline for a 5 chapter choose your own adventure story. The first act should set up the story and provide a pivotal decision at the end that will completely change the course of the story. The second act should present a challenge and incorporate a choice that will come back in the 5th and final chapter. The third act should provide a false victory or twist. The fourth act should be the final push. The 5th and final act is the climax and resolution. The story is about ");
