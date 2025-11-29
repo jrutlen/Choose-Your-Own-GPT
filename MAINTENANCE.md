@@ -96,11 +96,41 @@ pio device monitor
 
 ## API Key Management
 
-Never commit your OpenAI API key to version control!
+The device supports two methods for configuring your OpenAI API key:
+
+### Method 1: Web Configuration Portal (Recommended)
+
+1. Connect to the device's WiFi network or access it on your local network
+2. Navigate to the configuration portal
+3. Enter your API key in the "OpenAI Configuration" section
+4. Configuration is automatically saved to flash memory
+
+### Method 2: Compile-time Configuration
 
 1. Copy `src/credentials.h.template` to `src/credentials.h`
 2. Add your API key to `credentials.h`
 3. The `.gitignore` file ensures `credentials.h` is not committed
+
+**Important**: Never commit your OpenAI API key to version control!
+
+## Configuration Management
+
+The device uses ESP32 Preferences (non-volatile storage) to persist configuration:
+
+- **API Key**: OpenAI API key for story generation
+- **Story Prompts**: Customizable prompts for AI story generation
+- **Dial Labels**: 10 character names and 16 adventure settings
+
+All configuration can be updated via the web portal without recompiling.
+
+### Resetting Configuration
+
+To reset to default values:
+1. Clear the preferences partition using PlatformIO:
+   ```bash
+   pio run --target erase
+   ```
+2. Re-upload the firmware
 
 ## Common Issues
 
@@ -150,6 +180,29 @@ Potential areas for enhancement:
 
 1. Add retry logic for transient API failures
 2. Implement exponential backoff for API rate limits
-3. Add support for storing multiple API keys
-4. Implement story caching to reduce API calls
-5. Add telemetry for monitoring device health
+3. Implement story caching to reduce API calls
+4. Add telemetry for monitoring device health
+5. Add support for importing/exporting configuration via JSON
+6. Implement OTA (Over-The-Air) firmware updates
+
+## Continuous Integration
+
+The project includes GitHub Actions workflows for automated building:
+
+- **Build Workflow** (`.github/workflows/build.yml`): 
+  - Runs on every push and pull request
+  - Builds firmware for ESP32
+  - Uploads firmware artifacts
+  - Can be manually triggered via workflow_dispatch
+
+### Testing GitHub Actions Locally
+
+You can test the build locally before pushing:
+
+```bash
+cd ChooseYourOwnGPT
+cp src/credentials.h.template src/credentials.h
+pio run
+```
+
+This mirrors what the GitHub Actions workflow does.
