@@ -180,10 +180,7 @@ Potential areas for enhancement:
 
 1. Add retry logic for transient API failures
 2. Implement exponential backoff for API rate limits
-3. Implement story caching to reduce API calls
-4. Add telemetry for monitoring device health
 5. Add support for importing/exporting configuration via JSON
-6. Implement OTA (Over-The-Air) firmware updates
 
 ## Continuous Integration
 
