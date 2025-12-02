@@ -431,9 +431,7 @@ void setup() {
 }
 
 void printTitle(int chapterNumber) {
-  if (!printer.wake()) {
-    Serial.println("Warning: Printer wake failed");
-  }
+  printer.wake();
   printer.setSize('L');
   //center text 
   printer.justify('C');
@@ -451,9 +449,7 @@ void sendToPrint(const char* message) {
     Serial.println("Error: Null message passed to sendToPrint");
     return;
   }
-  if (!printer.wake()) {
-    Serial.println("Warning: Printer wake failed");
-  }
+  printer.wake();
   printer.setSize('S'); 
   printer.println(message);
   printer.feed(3);
