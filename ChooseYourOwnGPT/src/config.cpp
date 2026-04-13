@@ -76,7 +76,7 @@ void configLoad(AppConfig &cfg) {
     if (count > 0 && count <= MAX_NAMES) {
       cfg.nameCount = count;
       for (int i = 0; i < cfg.nameCount; i++) {
-        char key[8];
+        char key[16];
         snprintf(key, sizeof(key), "name%d", i);
         if (prefs.isKey(key)) {
           cfg.names[i] = prefs.getString(key);
@@ -90,7 +90,7 @@ void configLoad(AppConfig &cfg) {
     if (count > 0 && count <= MAX_ADVENTURES) {
       cfg.adventureCount = count;
       for (int i = 0; i < cfg.adventureCount; i++) {
-        char key[8];
+        char key[16];
         snprintf(key, sizeof(key), "adv%d", i);
         if (prefs.isKey(key)) {
           cfg.adventures[i] = prefs.getString(key);
@@ -123,14 +123,14 @@ void configSave(const AppConfig &cfg) {
 
   prefs.putInt("nameCnt", cfg.nameCount);
   for (int i = 0; i < cfg.nameCount; i++) {
-    char key[8];
+    char key[16];
     snprintf(key, sizeof(key), "name%d", i);
     prefs.putString(key, cfg.names[i]);
   }
 
   prefs.putInt("advCnt", cfg.adventureCount);
   for (int i = 0; i < cfg.adventureCount; i++) {
-    char key[8];
+    char key[16];
     snprintf(key, sizeof(key), "adv%d", i);
     prefs.putString(key, cfg.adventures[i]);
   }

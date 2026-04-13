@@ -73,6 +73,7 @@ static const int PWM_RESOLUTION   = 8;
 
 // ─── Matrix Scanning ───────────────────────────────────────
 static const int SCAN_DELAY_MS = 100;
+static const int DIAL_READ_DELAY_MS = 10;  // Settle time between sequential dial reads
 unsigned long lastScanTime = 0;
 
 int  dial[3]     = {0, 0, 0};
@@ -387,8 +388,8 @@ void loop() {
 
   case 3: {
     // Read current dial positions as baseline
-    lastDial[0] = checkDial(0); delay(10);
-    lastDial[1] = checkDial(1); delay(10);
+    lastDial[0] = checkDial(0); delay(DIAL_READ_DELAY_MS);
+    lastDial[1] = checkDial(1); delay(DIAL_READ_DELAY_MS);
     lastDial[2] = checkDial(2);
     state = 4;
     break;
@@ -400,8 +401,8 @@ void loop() {
 
     if (millis() - lastScanTime > SCAN_DELAY_MS) {
       lastScanTime = millis();
-      dial[0] = checkDial(0); delay(10);
-      dial[1] = checkDial(1); delay(10);
+      dial[0] = checkDial(0); delay(DIAL_READ_DELAY_MS);
+      dial[1] = checkDial(1); delay(DIAL_READ_DELAY_MS);
       dial[2] = checkDial(2);
     }
 
