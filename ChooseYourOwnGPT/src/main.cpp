@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <WebServer.h>
 #include <NetWizard.h>
+#include <memory>
 
 // Hardware
 #include <Wire.h>
@@ -19,7 +20,7 @@
 // ─── OpenAI Chat ────────────────────────────────────────────
 static const int TOKENS = 750;
 static const int NUM_MESSAGES = 14;
-ChatGPTuino chat{TOKENS, NUM_MESSAGES};
+std::unique_ptr<ChatGPTuino> chat = std::make_unique<ChatGPTuino>(TOKENS, NUM_MESSAGES);
 
 // ─── Networking ─────────────────────────────────────────────
 WebServer server(80);
@@ -121,7 +122,7 @@ void resetHardwareState();
 // ─── Configuration Callback ────────────────────────────────
 void onConfigSaved() {
   if (appConfig.apiKey.length() > 0) {
-    chat.init(appConfig.apiKey.c_str(), appConfig.model.c_str());
+    chat->init(appConfig.apiKey.c_str(), appConfig.model.c_str());
     Serial.println("Chat reinitialized with updated configuration");
   } else {
     Serial.println("Warning: API key is empty after config save");
@@ -165,7 +166,7 @@ void setup() {
       Serial.printf("Local IP: %s\n", NW.localIP().toString().c_str());
       Serial.printf("Config portal: http://%s/config\n", NW.localIP().toString().c_str());
       if (appConfig.apiKey.length() > 0) {
-        chat.init(appConfig.apiKey.c_str(), appConfig.model.c_str());
+        chat->init(appConfig.apiKey.c_str(), appConfig.model.c_str());
         Serial.println("Chat initialized");
       } else {
         Serial.println("Chat NOT initialized - configure API key at /config");
@@ -249,6 +250,16 @@ void setup() {
   printer.wake();
   printer.setSize('S');
   printer.setDefault();
+
+  // Print device name on boot
+  printer.setSize('L');
+  printer.justify('C');
+  printer.boldOn();
+  printer.println("Choose Your Own GPT");
+  printer.boldOff();
+  printer.justify('L');
+  printer.setSize('S');
+  printer.feed(2);
 
   // Configure PWM for dial LEDs
   ledcAttachChannel(PIN_DIAL_LED1, PWM_FREQ, PWM_RESOLUTION, PWM_CHANNEL_DIAL);
@@ -375,6 +386,15 @@ void resetHardwareState() {
   ledcAttachChannel(PIN_DIAL_LED3, PWM_FREQ, PWM_RESOLUTION, PWM_CHANNEL_DIAL);
 
   currentChapter = 1;
+
+  // Reset the chat session for the next story so the previous story's message
+  // history is not included in the next API request.  Reassigning the
+  // unique_ptr automatically destroys the old object and creates a fresh one
+  // with _msgCount = 0.
+  chat = std::make_unique<ChatGPTuino>(TOKENS, NUM_MESSAGES);
+  if (appConfig.apiKey.length() > 0) {
+    chat->init(appConfig.apiKey.c_str(), appConfig.model.c_str());
+  }
 }
 
 // ─── Clamped index helpers ─────────────────────────────────
@@ -399,10 +419,13 @@ void loop() {
   switch (state) {
 
   case 3: {
-    // Read current dial positions as baseline
-    lastDial[0] = checkDial(0); delay(DIAL_READ_DELAY_MS);
-    lastDial[1] = checkDial(1); delay(DIAL_READ_DELAY_MS);
-    lastDial[2] = checkDial(2);
+    // Read current dial positions as baseline; also sync dial[] to prevent
+    // stale values from triggering false dialSet detections on the first
+    // pass through state 4 (which would permanently detach the dial LED pins
+    // from the PWM channel and break the fade animation).
+    lastDial[0] = dial[0] = checkDial(0); delay(DIAL_READ_DELAY_MS);
+    lastDial[1] = dial[1] = checkDial(1); delay(DIAL_READ_DELAY_MS);
+    lastDial[2] = dial[2] = checkDial(2);
     state = 4;
     break;
   }
@@ -489,17 +512,17 @@ void loop() {
       + appConfig.adventures[advIdx]
       + appConfig.instructions;
 
-    chat.putMessage(initialPrompt.c_str(), initialPrompt.length());
+    chat->putMessage(initialPrompt.c_str(), initialPrompt.length());
     printTitle(currentChapter);
 
     // Get the outline (not printed)
-    chat.getResponse();
+    chat->getResponse();
 
     // Request and print the first chapter
     const char *startStory = "Begin";
-    chat.putMessage(startStory, strlen(startStory));
-    chat.getResponse();
-    sendToPrint(chat.getLastMessageContent());
+    chat->putMessage(startStory, strlen(startStory));
+    chat->getResponse();
+    sendToPrint(chat->getLastMessageContent());
 
     // Enable decision buttons
     ledcAttachChannel(PIN_LED_YELLOW, PWM_FREQ, PWM_RESOLUTION, PWM_CHANNEL_DIAL);
@@ -527,27 +550,27 @@ void loop() {
 
     if (decision == 1) {
       // Surprise ending (red button)
-      chat.putMessage(appConfig.surpriseEnding.c_str(), appConfig.surpriseEnding.length());
+      chat->putMessage(appConfig.surpriseEnding.c_str(), appConfig.surpriseEnding.length());
     } else if (decision == 2) {
       // Blue button
       if (currentChapter < MAX_CHAPTERS) {
-        chat.putMessage(appConfig.blueContinue.c_str(), appConfig.blueContinue.length());
+        chat->putMessage(appConfig.blueContinue.c_str(), appConfig.blueContinue.length());
       } else {
-        chat.putMessage(appConfig.blueComplete.c_str(), appConfig.blueComplete.length());
+        chat->putMessage(appConfig.blueComplete.c_str(), appConfig.blueComplete.length());
       }
     } else if (decision == 3) {
       // Yellow button
       if (currentChapter < MAX_CHAPTERS) {
-        chat.putMessage(appConfig.yellowContinue.c_str(), appConfig.yellowContinue.length());
+        chat->putMessage(appConfig.yellowContinue.c_str(), appConfig.yellowContinue.length());
       } else {
-        chat.putMessage(appConfig.yellowComplete.c_str(), appConfig.yellowComplete.length());
+        chat->putMessage(appConfig.yellowComplete.c_str(), appConfig.yellowComplete.length());
       }
     }
 
     Serial.println("Requesting Chapter: " + String(currentChapter));
     printTitle(currentChapter);
-    chat.getResponse();
-    printer.println(chat.getLastMessageContent());
+    chat->getResponse();
+    printer.println(chat->getLastMessageContent());
     printer.feed(3);
 
     if (currentChapter >= MAX_CHAPTERS) {
