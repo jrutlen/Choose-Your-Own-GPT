@@ -118,15 +118,21 @@ void checkButton();
 void fadeCalc();
 void slowFadeCalc();
 void resetHardwareState();
+void initChatIfConfigured();
+
+// ─── Chat Initialization Helper ────────────────────────────
+void initChatIfConfigured() {
+  if (appConfig.apiKey.length() > 0) {
+    chat->init(appConfig.apiKey.c_str(), appConfig.model.c_str());
+    Serial.println("Chat initialized");
+  } else {
+    Serial.println("Chat NOT initialized - configure API key at /config");
+  }
+}
 
 // ─── Configuration Callback ────────────────────────────────
 void onConfigSaved() {
-  if (appConfig.apiKey.length() > 0) {
-    chat->init(appConfig.apiKey.c_str(), appConfig.model.c_str());
-    Serial.println("Chat reinitialized with updated configuration");
-  } else {
-    Serial.println("Warning: API key is empty after config save");
-  }
+  initChatIfConfigured();
 }
 
 // ─── Setup ─────────────────────────────────────────────────
@@ -165,12 +171,7 @@ void setup() {
     if (status == NetWizardConnectionStatus::CONNECTED) {
       Serial.printf("Local IP: %s\n", NW.localIP().toString().c_str());
       Serial.printf("Config portal: http://%s/config\n", NW.localIP().toString().c_str());
-      if (appConfig.apiKey.length() > 0) {
-        chat->init(appConfig.apiKey.c_str(), appConfig.model.c_str());
-        Serial.println("Chat initialized");
-      } else {
-        Serial.println("Chat NOT initialized - configure API key at /config");
-      }
+      initChatIfConfigured();
       // (Re)start the web server every time WiFi connects or reconnects.
       // This is safe here because the lwIP stack is up by the time this
       // callback fires.  It also handles the reconnect case where the
@@ -251,12 +252,14 @@ void setup() {
   printer.setSize('S');
   printer.setDefault();
 
-  // Print device name on boot
-  printer.setSize('L');
+  // Print device name on boot (original logo style: medium, centred, bold inverse)
+  printer.setSize('M');
   printer.justify('C');
   printer.boldOn();
-  printer.println("Choose Your Own GPT");
+  printer.inverseOn();
+  printer.println("-Choose-Your-Own-GPT-");
   printer.boldOff();
+  printer.inverseOff();
   printer.justify('L');
   printer.setSize('S');
   printer.feed(2);
@@ -392,9 +395,7 @@ void resetHardwareState() {
   // unique_ptr automatically destroys the old object and creates a fresh one
   // with _msgCount = 0.
   chat = std::make_unique<ChatGPTuino>(TOKENS, NUM_MESSAGES);
-  if (appConfig.apiKey.length() > 0) {
-    chat->init(appConfig.apiKey.c_str(), appConfig.model.c_str());
-  }
+  initChatIfConfigured();
 }
 
 // ─── Clamped index helpers ─────────────────────────────────
