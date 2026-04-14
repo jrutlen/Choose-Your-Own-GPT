@@ -187,16 +187,19 @@ void setup() {
     Serial.printf("Portal state: %s\n", stateStr);
   });
 
-  // Register config routes and start the server BEFORE autoConnect.
-  // NetWizard only removes its own handlers in _stopHTTP(); app routes
-  // registered here survive the captive-portal lifecycle unchanged.
-  // Starting the server here also avoids the stale-socket issue that
-  // occurs when NetWizard tears down the AP interface after the portal:
-  // the socket is already bound to INADDR_ANY on the STA interface.
+  // Register config routes BEFORE autoConnect so they survive the captive-portal
+  // lifecycle: NetWizard's _stopHTTP() only removes its own tracked handlers
+  // (_index_handler, _status_handler, …), never the app's routes registered here.
   webPortalSetup(server, appConfig, onConfigSaved);
-  server.begin();
 
   NW.autoConnect("ChooseYourOwnGPT", "itMightBeMagic");
+
+  // Start the web server AFTER autoConnect. Calling server.begin() before
+  // WiFi.begin() triggers the lwIP "Invalid mbox" assert because the TCP/IP
+  // task mailbox does not exist yet.  In the captive-portal path NetWizard
+  // has already called server.begin() internally, so this call is a no-op;
+  // the /config routes registered above are still in place.
+  server.begin();
 
   if (NW.isConfigured()) {
     Serial.println("WiFi configured");
