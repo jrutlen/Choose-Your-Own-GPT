@@ -170,6 +170,11 @@ void setup() {
       } else {
         Serial.println("Chat NOT initialized - configure API key at /config");
       }
+      // (Re)start the web server every time WiFi connects or reconnects.
+      // This is safe here because the lwIP stack is up by the time this
+      // callback fires.  It also handles the reconnect case where the
+      // server socket was lost after a WiFi drop.
+      server.begin();
     }
   });
 
@@ -193,13 +198,9 @@ void setup() {
   webPortalSetup(server, appConfig, onConfigSaved);
 
   NW.autoConnect("ChooseYourOwnGPT", "itMightBeMagic");
-
-  // Start the web server AFTER autoConnect. Calling server.begin() before
-  // WiFi.begin() triggers the lwIP "Invalid mbox" assert because the TCP/IP
-  // task mailbox does not exist yet.  In the captive-portal path NetWizard
-  // has already called server.begin() internally, so this call is a no-op;
-  // the /config routes registered above are still in place.
-  server.begin();
+  // server.begin() is called inside the onConnectionStatus CONNECTED callback
+  // above, which fires during autoConnect() once WiFi is up and the lwIP stack
+  // is initialised.  It is also called on any subsequent reconnection.
 
   if (NW.isConfigured()) {
     Serial.println("WiFi configured");
@@ -388,7 +389,12 @@ static int clampIndex(int value, int maxCount) {
 
 void loop() {
   server.handleClient();
-  NW.loop();
+  // NW.loop() is intentionally NOT called here. We use NetWizardStrategy::BLOCKING
+  // so autoConnect() handles the entire portal session synchronously. Calling
+  // NW.loop() afterward causes it to eventually invoke _stopHTTP() (portal
+  // cleanup timeout), which stops the WebServer socket and makes /config
+  // unreachable. WiFi reconnection is handled natively by the ESP32 WiFi stack;
+  // server.begin() is re-called from the onConnectionStatus CONNECTED callback.
 
   switch (state) {
 
@@ -433,7 +439,6 @@ void loop() {
       checkButton();
       while (!button[2]) {
         server.handleClient();
-        NW.loop();
         checkButton();
         fadeCalc();
       }
