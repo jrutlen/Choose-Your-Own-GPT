@@ -187,6 +187,15 @@ void setup() {
     Serial.printf("Portal state: %s\n", stateStr);
   });
 
+  // Register config routes and start the server BEFORE autoConnect.
+  // NetWizard only removes its own handlers in _stopHTTP(); app routes
+  // registered here survive the captive-portal lifecycle unchanged.
+  // Starting the server here also avoids the stale-socket issue that
+  // occurs when NetWizard tears down the AP interface after the portal:
+  // the socket is already bound to INADDR_ANY on the STA interface.
+  webPortalSetup(server, appConfig, onConfigSaved);
+  server.begin();
+
   NW.autoConnect("ChooseYourOwnGPT", "itMightBeMagic");
 
   if (NW.isConfigured()) {
@@ -194,12 +203,6 @@ void setup() {
   } else {
     Serial.println("WiFi not configured");
   }
-
-  // Setup web configuration portal
-  webPortalSetup(server, appConfig, onConfigSaved);
-
-  // Start web server
-  server.begin();
 
   // Configure button LED pins
   pinMode(PIN_LED_RED, OUTPUT);
@@ -426,6 +429,8 @@ void loop() {
 
       checkButton();
       while (!button[2]) {
+        server.handleClient();
+        NW.loop();
         checkButton();
         fadeCalc();
       }
