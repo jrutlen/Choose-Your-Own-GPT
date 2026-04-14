@@ -1,0 +1,56 @@
+name: Build Firmware
+
+on:
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "ChooseYourOwnGPT/**"
+      - ".github/workflows/build.yml"
+  pull_request:
+    branches: ["main", "master"]
+    paths:
+      - "ChooseYourOwnGPT/**"
+      - ".github/workflows/build.yml"
+
+jobs:
+  build:
+    name: Build ESP32 Firmware
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/packages
+            ~/.platformio/cache
+          key: platformio-${{ hashFiles('ChooseYourOwnGPT/platformio.ini') }}
+          restore-keys: |
+            platformio-
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build firmware
+        working-directory: ChooseYourOwnGPT
+        run: pio run
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            ChooseYourOwnGPT/.pio/build/esp32dev/firmware.bin
+            ChooseYourOwnGPT/.pio/build/esp32dev/bootloader.bin
+            ChooseYourOwnGPT/.pio/build/esp32dev/partitions.bin
+          if-no-files-found: error
