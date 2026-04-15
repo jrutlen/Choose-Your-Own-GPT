@@ -50,7 +50,8 @@ void configLoadDefaults(AppConfig &cfg) {
     "'to do x, press the yellow button' or 'to do y, press the blue button'. At the end of each "
     "chapter you must present these two options. Don't include any chapter titles or numbers and "
     "use only basic punctuation like single quotes, commas, periods, new line, and exclamation "
-    "points. Do not use bold, italics, or any text formatting.";
+    "points. Do not use markdown, asterisks, hash symbols, dashes at the start of lines, bold, "
+    "italics, or any special formatting characters. Plain text only.";
 
   cfg.surpriseEnding  = "Write a surprise ending to the story that is different than either the blue or the yellow options.";
   cfg.blueContinue    = "Press the blue button.";
