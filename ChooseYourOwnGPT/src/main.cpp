@@ -112,6 +112,7 @@ static const int MAX_SLOW_FADE = 100;
 // ─── Forward Declarations ──────────────────────────────────
 void onConfigSaved();
 void printTitle(int chapterNumber);
+void printWrapped(const char *message);
 void sendToPrint(const char *message);
 int  checkDial(int dialNumber);
 void checkButton();
@@ -286,6 +287,58 @@ void printTitle(int chapterNumber) {
   printer.feed(2);
 }
 
+void printWrapped(const char *message) {
+  const int LINE_WIDTH = 32;
+  if (!message) return;
+
+  String remaining = String(message);
+  String currentLine = "";
+  int pos = 0;
+  int len = remaining.length();
+
+  auto flushLine = [&]() {
+    while ((int)currentLine.length() < LINE_WIDTH) currentLine += ' ';
+    printer.println(currentLine);
+    currentLine = "";
+  };
+
+  while (pos < len) {
+    // Skip leading spaces before the next word
+    while (pos < len && remaining[pos] == ' ') pos++;
+    if (pos >= len) break;
+
+    if (remaining[pos] == '\n') {
+      // Explicit newline forces a line break
+      flushLine();
+      pos++;
+      continue;
+    }
+
+    // Collect the next word
+    int wordStart = pos;
+    while (pos < len && remaining[pos] != ' ' && remaining[pos] != '\n') pos++;
+    String word = remaining.substring(wordStart, pos);
+
+    if (currentLine.length() == 0) {
+      // First word on the line; always accept it even if it exceeds LINE_WIDTH
+      // (no hyphenation — long words print on their own line and overflow visually)
+      currentLine = word;
+    } else if ((int)(currentLine.length() + 1 + word.length()) <= LINE_WIDTH) {
+      currentLine += ' ';
+      currentLine += word;
+    } else {
+      // Word doesn't fit — flush current line and start a new one
+      flushLine();
+      currentLine = word;
+    }
+  }
+
+  // Flush any remaining text
+  if (currentLine.length() > 0) {
+    flushLine();
+  }
+}
+
 void sendToPrint(const char *message) {
   if (!message) {
     Serial.println("sendToPrint: null message, skipping");
@@ -293,7 +346,7 @@ void sendToPrint(const char *message) {
   }
   printer.wake();
   printer.setSize('S');
-  printer.println(message);
+  printWrapped(message);
   printer.feed(3);
 }
 
@@ -577,7 +630,7 @@ void loop() {
     chat->getResponse();
     const char *chapterContent = chat->getLastMessageContent();
     if (chapterContent) {
-      printer.println(chapterContent);
+      printWrapped(chapterContent);
     } else {
       Serial.println("Warning: null content for chapter " + String(currentChapter));
     }
