@@ -287,6 +287,10 @@ void printTitle(int chapterNumber) {
 }
 
 void sendToPrint(const char *message) {
+  if (!message) {
+    Serial.println("sendToPrint: null message, skipping");
+    return;
+  }
   printer.wake();
   printer.setSize('S');
   printer.println(message);
@@ -571,7 +575,12 @@ void loop() {
     Serial.println("Requesting Chapter: " + String(currentChapter));
     printTitle(currentChapter);
     chat->getResponse();
-    printer.println(chat->getLastMessageContent());
+    const char *chapterContent = chat->getLastMessageContent();
+    if (chapterContent) {
+      printer.println(chapterContent);
+    } else {
+      Serial.println("Warning: null content for chapter " + String(currentChapter));
+    }
     printer.feed(3);
 
     if (currentChapter >= MAX_CHAPTERS) {
