@@ -11,6 +11,7 @@ struct AppConfig {
   // General settings
   String apiKey;
   String model;
+  bool hyphenate;  // wrap long words with a hyphen instead of overflowing
 
   // Character names for the small dial
   String names[MAX_NAMES];

@@ -289,17 +289,64 @@ void printTitle(int chapterNumber) {
 
 void printWrapped(const char *message) {
   const int LINE_WIDTH = 32;
+  // Minimum chars available to make hyphenation worthwhile: space + 1 char + '-'
+  const int MIN_HYPHENATION_SPACE = 3;
   if (!message) return;
 
+  bool hyphenate = appConfig.hyphenate;
   String remaining = String(message);
   String currentLine = "";
   int pos = 0;
   int len = remaining.length();
 
   auto flushLine = [&]() {
-    while ((int)currentLine.length() < LINE_WIDTH) currentLine += ' ';
+    int pad = LINE_WIDTH - (int)currentLine.length();
+    if (pad > 0) {
+      String padding(pad, ' ');
+      currentLine += padding;
+    }
     printer.println(currentLine);
     currentLine = "";
+  };
+
+  // Place a word onto the current line, hyphenating mid-word if enabled.
+  auto placeWord = [&](const String &word) {
+    int wpos = 0;
+    int wlen = word.length();
+    while (wpos < wlen) {
+      if (currentLine.length() == 0) {
+        if (!hyphenate || (wlen - wpos) <= LINE_WIDTH) {
+          // Whole remaining fragment fits, or hyphenation is off — just accept it
+          currentLine = word.substring(wpos);
+          wpos = wlen;
+        } else {
+          // Fragment exceeds a full line — break with hyphen at LINE_WIDTH-1
+          currentLine = word.substring(wpos, wpos + LINE_WIDTH - 1) + '-';
+          wpos += LINE_WIDTH - 1;
+          flushLine();
+        }
+      } else {
+        int space = LINE_WIDTH - (int)currentLine.length();
+        // needed = 1 (space separator before word) + remaining fragment length
+        int needed = 1 + (wlen - wpos);
+        if (needed <= space) {
+          // Word fits on the current line
+          currentLine += ' ';
+          currentLine += word.substring(wpos);
+          wpos = wlen;
+        } else if (hyphenate && space >= MIN_HYPHENATION_SPACE) {
+          // Enough room for: space + at least 1 char + hyphen
+          currentLine += ' ';
+          currentLine += word.substring(wpos, wpos + space - 2);
+          currentLine += '-';
+          wpos += space - 2;
+          flushLine();
+        } else {
+          // Flush current line and retry on a fresh line
+          flushLine();
+        }
+      }
+    }
   };
 
   while (pos < len) {
@@ -319,18 +366,7 @@ void printWrapped(const char *message) {
     while (pos < len && remaining[pos] != ' ' && remaining[pos] != '\n') pos++;
     String word = remaining.substring(wordStart, pos);
 
-    if (currentLine.length() == 0) {
-      // First word on the line; always accept it even if it exceeds LINE_WIDTH
-      // (no hyphenation — long words print on their own line and overflow visually)
-      currentLine = word;
-    } else if ((int)(currentLine.length() + 1 + word.length()) <= LINE_WIDTH) {
-      currentLine += ' ';
-      currentLine += word;
-    } else {
-      // Word doesn't fit — flush current line and start a new one
-      flushLine();
-      currentLine = word;
-    }
+    placeWord(word);
   }
 
   // Flush any remaining text
