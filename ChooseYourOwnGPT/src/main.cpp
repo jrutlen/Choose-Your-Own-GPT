@@ -301,10 +301,7 @@ void printWrapped(const char *message) {
 
   auto flushLine = [&]() {
     int pad = LINE_WIDTH - (int)currentLine.length();
-    if (pad > 0) {
-      String padding(pad, ' ');
-      currentLine += padding;
-    }
+    for (int i = 0; i < pad; i++) currentLine += ' ';
     printer.println(currentLine);
     currentLine = "";
   };
