@@ -249,7 +249,7 @@ void setup() {
   Serial2.begin(9600, SERIAL_8N1, 16, 17);
   printer.begin();
   printer.reset();
-  printer.wake();
+  //printer.wake();
   printer.setSize('S');
   printer.setDefault();
 
@@ -276,7 +276,7 @@ void setup() {
 // ─── Helper Functions ──────────────────────────────────────
 
 void printTitle(int chapterNumber) {
-  printer.wake();
+  //printer.wake();
   printer.setSize('L');
   printer.justify('C');
   printer.boldOn();
@@ -377,7 +377,7 @@ void sendToPrint(const char *message) {
     Serial.println("sendToPrint: null message, skipping");
     return;
   }
-  printer.wake();
+  //printer.wake();
   printer.setSize('S');
   printWrapped(message);
   printer.feed(3);
