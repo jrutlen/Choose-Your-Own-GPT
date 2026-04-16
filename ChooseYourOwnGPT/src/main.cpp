@@ -112,6 +112,7 @@ static const int MAX_SLOW_FADE = 100;
 // ─── Forward Declarations ──────────────────────────────────
 void onConfigSaved();
 void printTitle(int chapterNumber);
+void printWrapped(const char *message);
 void sendToPrint(const char *message);
 int  checkDial(int dialNumber);
 void checkButton();
@@ -286,6 +287,91 @@ void printTitle(int chapterNumber) {
   printer.feed(2);
 }
 
+void printWrapped(const char *message) {
+  const int LINE_WIDTH = 32;
+  // Minimum chars available to make hyphenation worthwhile: space + 1 char + '-'
+  const int MIN_HYPHENATION_SPACE = 3;
+  if (!message) return;
+
+  bool hyphenate = appConfig.hyphenate;
+  String remaining = String(message);
+  String currentLine = "";
+  int pos = 0;
+  int len = remaining.length();
+
+  auto flushLine = [&]() {
+    int pad = LINE_WIDTH - (int)currentLine.length();
+    for (int i = 0; i < pad; i++) currentLine += ' ';
+    printer.println(currentLine);
+    currentLine = "";
+  };
+
+  // Place a word onto the current line, hyphenating mid-word if enabled.
+  auto placeWord = [&](const String &word) {
+    int wpos = 0;
+    int wlen = word.length();
+    while (wpos < wlen) {
+      if (currentLine.length() == 0) {
+        if (!hyphenate || (wlen - wpos) <= LINE_WIDTH) {
+          // Whole remaining fragment fits, or hyphenation is off — just accept it
+          currentLine = word.substring(wpos);
+          wpos = wlen;
+        } else {
+          // Fragment exceeds a full line — break with hyphen at LINE_WIDTH-1
+          currentLine = word.substring(wpos, wpos + LINE_WIDTH - 1) + '-';
+          wpos += LINE_WIDTH - 1;
+          flushLine();
+        }
+      } else {
+        int space = LINE_WIDTH - (int)currentLine.length();
+        // needed = 1 (space separator before word) + remaining fragment length
+        int needed = 1 + (wlen - wpos);
+        if (needed <= space) {
+          // Word fits on the current line
+          currentLine += ' ';
+          currentLine += word.substring(wpos);
+          wpos = wlen;
+        } else if (hyphenate && space >= MIN_HYPHENATION_SPACE) {
+          // Enough room for: space + at least 1 char + hyphen
+          currentLine += ' ';
+          currentLine += word.substring(wpos, wpos + space - 2);
+          currentLine += '-';
+          wpos += space - 2;
+          flushLine();
+        } else {
+          // Flush current line and retry on a fresh line
+          flushLine();
+        }
+      }
+    }
+  };
+
+  while (pos < len) {
+    // Skip leading spaces before the next word
+    while (pos < len && remaining[pos] == ' ') pos++;
+    if (pos >= len) break;
+
+    if (remaining[pos] == '\n') {
+      // Explicit newline forces a line break
+      flushLine();
+      pos++;
+      continue;
+    }
+
+    // Collect the next word
+    int wordStart = pos;
+    while (pos < len && remaining[pos] != ' ' && remaining[pos] != '\n') pos++;
+    String word = remaining.substring(wordStart, pos);
+
+    placeWord(word);
+  }
+
+  // Flush any remaining text
+  if (currentLine.length() > 0) {
+    flushLine();
+  }
+}
+
 void sendToPrint(const char *message) {
   if (!message) {
     Serial.println("sendToPrint: null message, skipping");
@@ -293,7 +379,7 @@ void sendToPrint(const char *message) {
   }
   printer.wake();
   printer.setSize('S');
-  printer.println(message);
+  printWrapped(message);
   printer.feed(3);
 }
 
@@ -577,7 +663,7 @@ void loop() {
     chat->getResponse();
     const char *chapterContent = chat->getLastMessageContent();
     if (chapterContent) {
-      printer.println(chapterContent);
+      printWrapped(chapterContent);
     } else {
       Serial.println("Warning: null content for chapter " + String(currentChapter));
     }

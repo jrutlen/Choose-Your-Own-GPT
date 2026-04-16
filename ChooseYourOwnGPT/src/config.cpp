@@ -6,6 +6,7 @@ static const char NVS_NAMESPACE[] = "cyogpt";
 void configLoadDefaults(AppConfig &cfg) {
   cfg.apiKey = "";
   cfg.model = "gpt-4o";
+  cfg.hyphenate = false;
 
   cfg.nameCount = 10;
   cfg.names[0] = "Aunt Lily (Mia and Zoe's aunt, married to Uncle Ray)";
@@ -69,8 +70,9 @@ void configLoad(AppConfig &cfg) {
     return;
   }
 
-  if (prefs.isKey("apiKey"))  cfg.apiKey = prefs.getString("apiKey");
-  if (prefs.isKey("model"))   cfg.model  = prefs.getString("model");
+  if (prefs.isKey("apiKey"))    cfg.apiKey   = prefs.getString("apiKey");
+  if (prefs.isKey("model"))     cfg.model    = prefs.getString("model");
+  if (prefs.isKey("hyphenate")) cfg.hyphenate = prefs.getBool("hyphenate");
 
   if (prefs.isKey("nameCnt")) {
     int count = prefs.getInt("nameCnt", cfg.nameCount);
@@ -119,8 +121,9 @@ void configSave(const AppConfig &cfg) {
     return;
   }
 
-  prefs.putString("apiKey", cfg.apiKey);
-  prefs.putString("model",  cfg.model);
+  prefs.putString("apiKey",   cfg.apiKey);
+  prefs.putString("model",    cfg.model);
+  prefs.putBool("hyphenate",  cfg.hyphenate);
 
   prefs.putInt("nameCnt", cfg.nameCount);
   for (int i = 0; i < cfg.nameCount; i++) {
@@ -159,8 +162,9 @@ void configReset(AppConfig &cfg) {
 }
 
 void configToJson(const AppConfig &cfg, JsonDocument &doc) {
-  doc["apiKey"] = cfg.apiKey;
-  doc["model"]  = cfg.model;
+  doc["apiKey"]    = cfg.apiKey;
+  doc["model"]     = cfg.model;
+  doc["hyphenate"] = cfg.hyphenate;
 
   JsonArray names = doc["names"].to<JsonArray>();
   for (int i = 0; i < cfg.nameCount; i++) {
@@ -183,8 +187,9 @@ void configToJson(const AppConfig &cfg, JsonDocument &doc) {
 }
 
 bool configFromJson(AppConfig &cfg, const JsonDocument &doc) {
-  if (doc["apiKey"].is<const char *>()) cfg.apiKey = doc["apiKey"].as<String>();
-  if (doc["model"].is<const char *>())  cfg.model  = doc["model"].as<String>();
+  if (doc["apiKey"].is<const char *>())  cfg.apiKey   = doc["apiKey"].as<String>();
+  if (doc["model"].is<const char *>())   cfg.model    = doc["model"].as<String>();
+  if (doc["hyphenate"].is<bool>())       cfg.hyphenate = doc["hyphenate"].as<bool>();
 
   if (doc["names"].is<JsonArrayConst>()) {
     JsonArrayConst arr = doc["names"];

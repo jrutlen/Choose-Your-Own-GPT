@@ -40,6 +40,10 @@ textarea{min-height:100px;resize:vertical}
 <div class="note">Stored on the device only. Never shared externally.</div>
 <label>OpenAI Model</label>
 <input type="text" id="model" placeholder="gpt-4o">
+<label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer">
+<input type="checkbox" id="hyphenate" style="width:auto">
+<span>Hyphenate long words when wrapping</span>
+</label>
 </div>
 
 <h2>Character Names (Small Dial)</h2>
@@ -97,6 +101,7 @@ var r=await fetch('/api/config');
 var c=await r.json();
 $('apiKey').value=c.apiKey||'';
 $('model').value=c.model||'';
+$('hyphenate').checked=!!c.hyphenate;
 var nd=$('nd');nd.innerHTML='';
 (c.names||[]).forEach(function(n,i){nd.innerHTML+='<label>Position '+i+'</label><input type="text" class="ni" value="'+esc(n)+'">';});
 var ad=$('ad');ad.innerHTML='';
@@ -116,6 +121,7 @@ async function saveAll(){
 var data={
 apiKey:$('apiKey').value,
 model:$('model').value,
+hyphenate:$('hyphenate').checked,
 names:[].map.call(document.querySelectorAll('.ni'),function(i){return i.value;}),
 adventures:[].map.call(document.querySelectorAll('.ai'),function(i){return i.value;}),
 prompts:{
