@@ -45,6 +45,38 @@ This project uses [PlatformIO](https://platformio.org/). All library dependencie
 | NetWizard | 1.2.0 |
 | ArduinoJson | 7.3.1 |
 
+### Building with GitHub Actions
+
+A workflow (`.github/workflows/build.yml`) automatically builds the firmware on every push or pull request to `main`/`master` that touches `ChooseYourOwnGPT/` or the workflow file itself. No local toolchain is required to produce a flashable binary.
+
+**What the workflow does:**
+1. Checks out the repository.
+2. Installs PlatformIO via `pip`.
+3. Runs `pio run` inside `ChooseYourOwnGPT/`.
+4. Uploads the compiled binaries as a `firmware` artifact:
+   - `firmware.bin` — application image
+   - `bootloader.bin` — ESP32 bootloader
+   - `partitions.bin` — partition table
+
+**Downloading the artifact:**
+1. Go to the **Actions** tab of the repository on GitHub.
+2. Click the latest successful **Build Firmware** run.
+3. Scroll to the **Artifacts** section at the bottom and download `firmware`.
+4. Unzip the archive to get the `.bin` files.
+
+**Flashing the downloaded firmware:**
+
+To flash from scratch (first time or full reflash), use `esptool.py`:
+```
+esptool.py --chip esp32 --baud 921600 \
+  write_flash \
+  0x1000  bootloader.bin \
+  0x8000  partitions.bin \
+  0x10000 firmware.bin
+```
+
+To update an already-running device, use the OTA firmware update in the web portal — see [OTA Firmware Update](#ota-firmware-update) below.
+
 ## First-Time Setup
 
 1. Power on the device. It will start a Wi-Fi access point named **`ChooseYourOwnGPT`** with the password **`itMightBeMagic`**.
