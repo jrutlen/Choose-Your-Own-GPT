@@ -141,6 +141,62 @@ The `/config` portal includes a firmware update section. Select a compiled `.bin
 5. Press the **red button** at any point to trigger a surprise ending.
 6. After the final (5th) chapter, the story is complete. Set the dials and press Go to start a new story.
 
+## Network Printing
+
+The device also works as a simple network printer. It listens on TCP port **9100** and forwards every byte it receives, unchanged, to the thermal printer. A job ends when the client closes the connection or sends nothing for 3 seconds. After each job the printer's text formatting is reset, so stories print normally afterwards.
+
+Jobs are handled between story steps. While a chapter is generating or printing, the sender waits until the device is free.
+
+Quick test from any machine on the network:
+```
+echo "Hello from the network" | nc -q 5 <device-ip> 9100
+```
+
+### Python client
+
+`clients/python/cyogpt_printer.py` is a single-file client that builds the printer's command bytes. Plain text and ASCII-art glyphs need only the standard library. Printing images or rendering TrueType text needs [Pillow](https://pypi.org/project/pillow/) (`pip install pillow`).
+
+```python
+from cyogpt_printer import Printer
+
+HEART = [
+    ".##...##.",
+    "####.####",
+    "#########",
+    ".#######.",
+    "..#####..",
+    "...###...",
+    "....#....",
+]
+
+with Printer("192.168.1.50") as p:          # sent as one job when the block exits
+    p.justify("C").size("L").bold().text("Hello!").bold(False).size("S")
+    p.glyph(HEART, scale=6, align="C")      # ASCII-art glyph, each pixel 6x6 dots
+    p.render_text("☀ 21°C ☂", font_path="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    p.image("logo.png")                     # scaled to 384 px and dithered
+    p.justify("L").text("Printed from a Raspberry Pi")
+    p.feed(3)
+```
+
+| Method | Description |
+|--------|-------------|
+| `text(s)` / `write(s)` | Text with or without a newline (32 chars per line at size S, encoded as CP437) |
+| `bold()`, `underline(0-2)`, `inverse()`, `size('S'/'M'/'L')`, `justify('L'/'C'/'R')`, `line_height(dots)` | Text styles |
+| `feed(n)` | Feed *n* lines |
+| `glyph(rows, scale, align)` | Print ASCII-art (`#` = black) as a bitmap |
+| `bitmap(w, h, data, align)` | Print a raw 1-bit bitmap (MSB-first rows, 1 = black, max 384 px wide) |
+| `image(path_or_pil, align)` | Print an image (needs Pillow) |
+| `render_text(s, font_path, font_size, align)` | Draw any Unicode text or symbol with a font (needs Pillow) |
+| `raw(bytes)` | Send arbitrary printer command bytes |
+
+It can also be run from the command line:
+```
+python cyogpt_printer.py <device-ip> "Some text" --center --size M
+python cyogpt_printer.py <device-ip> --image photo.jpg
+```
+
+> Anyone on your local network can print to the device. There is no authentication.
+
 ## Related
 
 Build log with photos
