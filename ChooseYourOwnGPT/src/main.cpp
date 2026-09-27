@@ -16,6 +16,7 @@
 // Configuration and Web Portal
 #include "config.h"
 #include "web_portal.h"
+#include "net_print.h"
 
 // ─── OpenAI Chat ────────────────────────────────────────────
 static const int TOKENS = 750;
@@ -178,6 +179,7 @@ void setup() {
       // callback fires.  It also handles the reconnect case where the
       // server socket was lost after a WiFi drop.
       server.begin();
+      netPrintBegin();
     }
   });
 
@@ -252,6 +254,7 @@ void setup() {
   //printer.wake();
   printer.setSize('S');
   printer.setDefault();
+  netPrintSetup(printer, Serial2);
 
   // Print device name on boot (original logo style: medium, centred, bold inverse)
   printer.setSize('M');
@@ -500,6 +503,7 @@ static int clampIndex(int value, int maxCount) {
 
 void loop() {
   server.handleClient();
+  netPrintLoop();
   // NW.loop() is intentionally NOT called here. We use NetWizardStrategy::BLOCKING
   // so autoConnect() handles the entire portal session synchronously. Calling
   // NW.loop() afterward causes it to eventually invoke _stopHTTP() (portal
@@ -553,6 +557,7 @@ void loop() {
       checkButton();
       while (!button[2]) {
         server.handleClient();
+        netPrintLoop();
         checkButton();
         fadeCalc();
       }
