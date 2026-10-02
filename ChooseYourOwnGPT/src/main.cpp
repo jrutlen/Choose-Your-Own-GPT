@@ -16,6 +16,7 @@
 // Configuration and Web Portal
 #include "config.h"
 #include "web_portal.h"
+#include "net_print.h"
 
 // ─── OpenAI Chat ────────────────────────────────────────────
 static const int TOKENS = 750;
@@ -109,6 +110,13 @@ static const unsigned long FADE_SPEED_MS      = 1;
 static const unsigned long SLOW_FADE_SPEED_MS = 10;
 static const int MAX_SLOW_FADE = 100;
 
+// ─── Idle LEDs ─────────────────────────────────────────────
+// Whether the dial LEDs breathe while the box waits for a story. Another device
+// can switch them off over the network (POST /api/leds {"idle": false}), say
+// while the box is the telegraph printer in a dark room. Turning a dial still
+// lights its LED. Not saved: the box always starts with them on.
+bool idleLeds = true;
+
 // ─── Forward Declarations ──────────────────────────────────
 void onConfigSaved();
 void printTitle(int chapterNumber);
@@ -178,6 +186,7 @@ void setup() {
       // callback fires.  It also handles the reconnect case where the
       // server socket was lost after a WiFi drop.
       server.begin();
+      netPrintBegin();
     }
   });
 
@@ -199,6 +208,21 @@ void setup() {
   // lifecycle: NetWizard's _stopHTTP() only removes its own tracked handlers
   // (_index_handler, _status_handler, …), never the app's routes registered here.
   webPortalSetup(server, appConfig, onConfigSaved);
+
+  // Idle LEDs on or off, for a device that borrows the printer (see idleLeds).
+  server.on("/api/leds", HTTP_GET, []() {
+    server.send(200, "application/json", String("{\"idle\":") + (idleLeds ? "true" : "false") + "}");
+  });
+  server.on("/api/leds", HTTP_POST, []() {
+    JsonDocument doc;
+    if (deserializeJson(doc, server.arg("plain")) || !doc["idle"].is<bool>()) {
+      server.send(400, "application/json", "{\"error\":\"send {\\\"idle\\\": true} or {\\\"idle\\\": false}\"}");
+      return;
+    }
+    idleLeds = doc["idle"].as<bool>();
+    Serial.printf("Idle LEDs %s\n", idleLeds ? "on" : "off");
+    server.send(200, "application/json", String("{\"idle\":") + (idleLeds ? "true" : "false") + "}");
+  });
 
   NW.autoConnect("ChooseYourOwnGPT", "itMightBeMagic");
   // server.begin() is called inside the onConnectionStatus CONNECTED callback
@@ -252,6 +276,7 @@ void setup() {
   //printer.wake();
   printer.setSize('S');
   printer.setDefault();
+  netPrintSetup(printer, Serial2);
 
   // Print device name on boot (original logo style: medium, centred, bold inverse)
   printer.setSize('M');
@@ -500,6 +525,7 @@ static int clampIndex(int value, int maxCount) {
 
 void loop() {
   server.handleClient();
+  netPrintLoop();
   // NW.loop() is intentionally NOT called here. We use NetWizardStrategy::BLOCKING
   // so autoConnect() handles the entire portal session synchronously. Calling
   // NW.loop() afterward causes it to eventually invoke _stopHTTP() (portal
@@ -522,8 +548,14 @@ void loop() {
   }
 
   case 4: {
-    // Ready: wait for all three dials to be turned, then wait for green button
-    fadeCalc();
+    // Ready: wait for all three dials to be turned, then wait for green button.
+    // The dial LEDs breathe, unless they have been switched off and nobody has
+    // touched a dial yet.
+    if (idleLeds || dialSet[0] || dialSet[1] || dialSet[2]) {
+      fadeCalc();
+    } else {
+      ledcWriteChannel(PWM_CHANNEL_DIAL, 0);
+    }
 
     if (millis() - lastScanTime > SCAN_DELAY_MS) {
       lastScanTime = millis();
@@ -553,6 +585,7 @@ void loop() {
       checkButton();
       while (!button[2]) {
         server.handleClient();
+        netPrintLoop();
         checkButton();
         fadeCalc();
       }
