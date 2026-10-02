@@ -197,6 +197,18 @@ python cyogpt_printer.py <device-ip> --image photo.jpg
 
 > Anyone on your local network can print to the device. There is no authentication.
 
+### Idle LEDs
+
+While the box waits for a story, its dial LEDs breathe. A device that borrows the printer can switch that off, say while the box stands in a dark room as part of something else, and back on again:
+
+```
+curl -X POST http://<device-ip>/api/leds -d '{"idle": false}'   # dark while idle
+curl -X POST http://<device-ip>/api/leds -d '{"idle": true}'    # breathing again
+curl http://<device-ip>/api/leds                                 # {"idle":true}
+```
+
+Turning a dial still lights its LED, and a story runs exactly as usual. The setting is not saved: the box always starts with the LEDs on.
+
 ## Related
 
 Build log with photos
